@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { MenuSection } from './components/MenuSection';
@@ -59,8 +59,10 @@ export default function App() {
   // Checkout pending details
   const [pendingCustomer, setPendingCustomer] = useState<OrderCustomer | null>(null);
   const [pendingDeliveryFee, setPendingDeliveryFee] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [pendingMethod, setPendingMethod] = useState<PaymentMethod>('card');
+  const [isPromoActive, setIsPromoActive] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync to local storage
   useEffect(() => {
@@ -83,12 +85,20 @@ export default function App() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Cart calculations
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const cartSubtotal = cart.reduce((acc, item) => acc + item.totalPrice, 0);
+  // Discount follows the current cart instead of being frozen at the moment the promo was applied
+  const discount = isPromoActive ? Math.round(cartSubtotal * 0.1) : 0;
+
+  // An emptied cart drops the promo
+  useEffect(() => {
+    if (cart.length === 0) setIsPromoActive(false);
+  }, [cart.length]);
 
   // Add customized pizza to cart
   const handleAddToCart = (params: {
@@ -195,8 +205,7 @@ export default function App() {
   const handleApplyPromo = (code: string): boolean => {
     const clean = code.trim().toUpperCase();
     if (clean === 'BBPIZZA' || clean === 'BISHKEK' || clean === 'BB10') {
-      const discountVal = Math.round(cartSubtotal * 0.1);
-      setDiscount(discountVal);
+      setIsPromoActive(true);
       showToast('Промокод применен: скидка 10%!');
       return true;
     }
@@ -217,6 +226,7 @@ export default function App() {
   ) => {
     setPendingCustomer(customer);
     setPendingDeliveryFee(deliveryFee);
+    setPendingMethod(method);
     setIsCheckoutOpen(false);
 
     if (method === 'card' || method === 'optima') {
@@ -238,6 +248,7 @@ export default function App() {
 
   // Complete Card or MBank payment successfully to 4169585350089446
   const handlePaymentSuccess = (paymentInfo: {
+    method: PaymentMethod;
     brand: CardBrand;
     last4: string;
     transactionId: string;
@@ -250,9 +261,10 @@ export default function App() {
         customer: pendingCustomer,
         deliveryFee: pendingDeliveryFee,
         payment: {
-          method: 'card',
-          cardBrand: paymentInfo.brand,
-          cardLast4: paymentInfo.last4,
+          method: paymentInfo.method,
+          ...(paymentInfo.method === 'card'
+            ? { cardBrand: paymentInfo.brand, cardLast4: paymentInfo.last4 }
+            : {}),
           status: 'paid',
           transactionId: paymentInfo.transactionId,
           paidAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -301,7 +313,10 @@ export default function App() {
         {
           status: 'confirmed',
           label: 'Заказ подтвержден',
-          subtext: `Успешно оплачен на счёт 4169...9446 · ${params.payment.cardBrand?.toUpperCase() || 'ОНЛАЙН'}`,
+          subtext:
+            params.payment.status === 'paid'
+              ? `Успешно оплачен на счёт 4169...9446 · ${params.payment.cardBrand?.toUpperCase() || 'ОНЛАЙН'}`
+              : 'Оплата курьеру при получении',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           completed: true,
         },
@@ -310,7 +325,7 @@ export default function App() {
 
     setActiveOrder(newOrder);
     setCart([]); // Clear cart
-    setDiscount(0);
+    setIsPromoActive(false);
     setPendingCustomer(null);
     setIsTrackerOpen(true);
     showToast(`Заказ #${newOrderId} оформлен! Отслеживайте курьера на карте.`);
@@ -440,12 +455,15 @@ export default function App() {
       />
 
       {/* Modals & Drawers */}
-      <PizzaModal
-        pizza={selectedPizza}
-        isOpen={Boolean(selectedPizza)}
-        onClose={() => setSelectedPizza(null)}
-        onAddToCart={handleAddToCart}
-      />
+      {selectedPizza && (
+        <PizzaModal
+          key={selectedPizza.id}
+          pizza={selectedPizza}
+          isOpen
+          onClose={() => setSelectedPizza(null)}
+          onAddToCart={handleAddToCart}
+        />
+      )}
 
       <CartDrawer
         isOpen={isCartOpen}
@@ -459,21 +477,29 @@ export default function App() {
         onApplyPromo={handleApplyPromo}
       />
 
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        items={cart}
-        subtotal={cartSubtotal}
-        discount={discount}
-        onStartPayment={handleStartPayment}
-      />
+      {isCheckoutOpen && (
+        <CheckoutModal
+          isOpen
+          onClose={() => setIsCheckoutOpen(false)}
+          items={cart}
+          subtotal={cartSubtotal}
+          discount={discount}
+          onStartPayment={handleStartPayment}
+        />
+      )}
 
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        amount={Math.max(0, cartSubtotal - discount + pendingDeliveryFee)}
-        onPaymentSuccess={handlePaymentSuccess}
-      />
+      {isPaymentOpen && (
+        <PaymentModal
+          isOpen
+          onClose={() => {
+            setIsPaymentOpen(false);
+            setPendingCustomer(null);
+          }}
+          amount={Math.max(0, cartSubtotal - discount + (pendingCustomer ? pendingDeliveryFee : 0))}
+          initialTab={pendingCustomer && pendingMethod === 'optima' ? 'transfer' : 'card'}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
 
       <PaymentRequisitesModal
         isOpen={isRequisitesOpen}
@@ -488,12 +514,15 @@ export default function App() {
         }}
       />
 
-      <BishkekLiveTracker
-        order={activeOrder}
-        isOpen={isTrackerOpen}
-        onClose={() => setIsTrackerOpen(false)}
-        onSeedDemoOrder={handleSeedDemoOrder}
-      />
+      {isTrackerOpen && (
+        <BishkekLiveTracker
+          key={activeOrder?.id ?? 'no-order'}
+          order={activeOrder}
+          isOpen
+          onClose={() => setIsTrackerOpen(false)}
+          onSeedDemoOrder={handleSeedDemoOrder}
+        />
+      )}
 
       <DeliveryZonesModal
         isOpen={isZonesOpen}

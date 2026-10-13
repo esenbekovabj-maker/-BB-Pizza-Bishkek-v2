@@ -34,8 +34,6 @@ export const BishkekLiveTracker: React.FC<BishkekLiveTrackerProps> = ({
   onUpdateOrderStatus,
   onSeedDemoOrder,
 }) => {
-  if (!isOpen) return null;
-
   // Real-time animation states
   const [courierProgress, setCourierProgress] = useState(order?.progressPercent || 35);
   const [simulationSpeed, setSimulationSpeed] = useState<1 | 3 | 10>(1);
@@ -98,6 +96,8 @@ export const BishkekLiveTracker: React.FC<BishkekLiveTrackerProps> = ({
 
     return () => clearInterval(interval);
   }, [order, simulationSpeed]);
+
+  if (!isOpen) return null;
 
   // Derived current status based on progress
   const activeStatus: OrderStatus =
@@ -485,8 +485,13 @@ export const BishkekLiveTracker: React.FC<BishkekLiveTrackerProps> = ({
                       {
                         key: 'confirmed',
                         threshold: 0,
-                        title: 'Заказ подтвержден и оплачен',
-                        desc: `Оплата картой ${order.payment.cardBrand?.toUpperCase() || 'ЭЛКАРТ'} •••• ${order.payment.cardLast4 || '7382'}`,
+                        title: order.payment.status === 'paid' ? 'Заказ подтвержден и оплачен' : 'Заказ подтвержден',
+                        desc:
+                          order.payment.method === 'cash'
+                            ? 'Оплата курьеру при получении (наличные / терминал)'
+                            : order.payment.method === 'optima'
+                            ? 'Оплата переводом через Оптима24 / Оптима Банк'
+                            : `Оплата картой ${order.payment.cardBrand?.toUpperCase() || 'ЭЛКАРТ'} •••• ${order.payment.cardLast4 || '7382'}`,
                         icon: CheckCircle2,
                       },
                       {

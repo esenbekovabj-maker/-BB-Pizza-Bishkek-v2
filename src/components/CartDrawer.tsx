@@ -28,7 +28,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 }) => {
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,7 +41,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     if (!promoInput.trim()) return;
     const success = onApplyPromo(promoInput.trim());
     if (success) {
-      setPromoApplied(true);
       setPromoError('');
     } else {
       setPromoError('Промокод недействителен (попробуйте BBPIZZA или BISHKEK)');
@@ -214,7 +212,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 Применить
               </button>
             </form>
-            {promoApplied && (
+            {discount > 0 && (
               <div className="text-xs text-emerald-700 font-semibold">
                 ✓ Скидка 10% успешно применена!
               </div>

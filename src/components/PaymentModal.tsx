@@ -16,7 +16,7 @@ import {
   Receipt,
   Download,
 } from 'lucide-react';
-import { CardBrand } from '../types';
+import { CardBrand, PaymentMethod } from '../types';
 import { WHATSAPP_PHONE_RAW, WHATSAPP_PHONE_FORMATTED } from '../utils/whatsapp';
 
 export const RECIPIENT_CARD_NUMBER = '4169585350089446';
@@ -29,6 +29,7 @@ interface PaymentModalProps {
   amount: number;
   initialTab?: 'card' | 'transfer';
   onPaymentSuccess: (paymentInfo: {
+    method: PaymentMethod;
     brand: CardBrand;
     last4: string;
     transactionId: string;
@@ -55,8 +56,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   initialTab = 'card',
   onPaymentSuccess,
 }) => {
-  if (!isOpen) return null;
-
   // Custom amount handling if opened standalone (amount === 0)
   const [effectiveAmount, setEffectiveAmount] = useState<number>(amount > 0 ? amount : 750);
   const [customAmountInput, setCustomAmountInput] = useState<string>(
@@ -92,6 +91,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // Digital Receipt state after successful transaction
   const [receipt, setReceipt] = useState<PaymentReceiptData | null>(null);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
+
+  if (!isOpen) return null;
 
   // Detect card brand
   const detectBrand = (num: string): CardBrand => {
@@ -228,6 +229,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setReceipt(receiptData);
 
       onPaymentSuccess({
+        method: 'card',
         brand: currentBrand,
         last4,
         transactionId: txId,
@@ -264,6 +266,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setReceipt(receiptData);
 
       onPaymentSuccess({
+        method: 'optima',
         brand: 'visa',
         last4: RECIPIENT_CARD_NUMBER.slice(-4),
         transactionId: txId,

@@ -21,8 +21,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   discount,
   onStartPayment,
 }) => {
-  if (!isOpen) return null;
-
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+996 ');
   const [districtId, setDistrictId] = useState(BISHKEK_DISTRICTS[0].id);
@@ -34,6 +32,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [comment, setComment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [errorMsg, setErrorMsg] = useState('');
+
+  if (!isOpen) return null;
 
   const selectedDistrict = BISHKEK_DISTRICTS.find((d) => d.id === districtId) || BISHKEK_DISTRICTS[0];
   const deliveryFee = subtotal >= 500 ? 0 : selectedDistrict.deliveryCostSom;
@@ -328,6 +328,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <span>
                 {paymentMethod === 'card'
                   ? 'Перейти к оплате картой'
+                  : paymentMethod === 'optima'
+                  ? 'Перейти к оплате переводом'
                   : 'Подтвердить заказ'}
               </span>
               <span className="tabular-nums text-lg font-black">{totalAmount} сом</span>
